@@ -20,20 +20,16 @@ pub fn make_client_and_store() -> ApiClient {
 }
 
 pub async fn load_cookies_from_json(path: impl AsRef<Path>) -> anyhow::Result<ApiClient> {
-    let cookie_store = CookieStore::default();
-    let cookie_store = CookieStoreMutex::new(cookie_store);
-    let cookie_store = Arc::new(cookie_store);
+    let cookie_store = {
+        // TODO replace the `std::fs` calls with `tokio::fs` calls
+        let mut file = File::open(path).await?;
+        let mut text = String::new();
+        file.read_to_string(&mut text).await?;
 
-    let mut file = File::open(path).await?;
-    let mut text = String::new();
-    file.read_to_string(&mut text).await?;
-
-    {
-        let mut cookie_store = cookie_store.lock().unwrap();
-        let cookies = serde_json::from_str(&text)?;
-
-        *cookie_store = cookies;
-    }
+        reqwest_cookie_store::CookieStore::load_json(text.as_bytes()).unwrap()
+    };
+    let cookie_store = reqwest_cookie_store::CookieStoreMutex::new(cookie_store);
+    let cookie_store = std::sync::Arc::new(cookie_store);
 
     let client = ClientBuilder::new()
         .cookie_provider(cookie_store.clone())
