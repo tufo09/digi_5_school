@@ -8,6 +8,7 @@ use reqwest_cookie_store::CookieStoreMutex;
 use tokio::io::AsyncWriteExt;
 use util::ApiClient;
 
+mod crawl;
 mod login;
 mod util;
 
@@ -23,6 +24,15 @@ async fn main() -> anyhow::Result<()> {
             handle_resume(&timestamp, &login_cookies).await.unwrap()
         }
     };
+
+    let books = crawl::get_books(client).await.unwrap();
+
+    let mut path = PathBuf::from("d5s/downloads/meta");
+    path.push(format!("{timestamp}_books.json"));
+    let file = std::fs::File::create(path)?;
+    let mut file = std::io::BufWriter::new(file);
+
+    serde_json::to_writer_pretty(&mut file, &books)?;
 
     Ok(())
 }
