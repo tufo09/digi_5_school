@@ -13,6 +13,7 @@ lazy_static! {
         Regex::new(r#"<input name='([^']+)' value='([^']*)'>"#).unwrap();
     static ref BOOK_HTML_META_REGEX: Regex =
         Regex::new(r#"<meta name="([^"]+)"(?: |\n)+content="([^"]*)" ?\/>"#).unwrap();
+    static ref BOOK_HTML_PAGE_REGEX: Regex = Regex::new(r#"\[(\d+),(\d+)\]"#).unwrap();
 }
 
 pub async fn do_book_form_dance(
@@ -110,18 +111,30 @@ pub struct BookMeta {
     publisher_tel: String,
     publisher_mail: String,
     // viewport: String,
+    page_sizes: Vec<[u16; 2]>,
 }
 
 pub fn extract_metadata_from_initial_html(initial_book_html: &str) -> anyhow::Result<BookMeta> {
     let mut meta = HashMap::new();
 
+    // Get the <meta> tags
     BOOK_HTML_META_REGEX
-        .captures_iter(&initial_book_html)
+        .captures_iter(initial_book_html)
         .for_each(|capture| {
             meta.insert(capture[1].to_string(), capture[2].to_string());
         });
 
-    dbg!(&meta);
+    // Get the page sizes
+    let mut page_sizes = Vec::new();
+
+    BOOK_HTML_PAGE_REGEX
+        .captures_iter(initial_book_html)
+        .for_each(|capture| {
+            let width = capture[1].parse::<u16>().unwrap();
+            let height = capture[2].parse::<u16>().unwrap();
+
+            page_sizes.push([width, height]);
+        });
 
     let book_meta = BookMeta {
         title: meta.get("title").context("Missing title")?.to_string(),
@@ -154,6 +167,7 @@ pub fn extract_metadata_from_initial_html(initial_book_html: &str) -> anyhow::Re
         //     .get("viewport")
         //     .context("Missing viewport")?
         //     .to_string(),
+        page_sizes,
     };
 
     Ok(book_meta)
