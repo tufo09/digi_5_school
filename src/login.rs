@@ -1,7 +1,7 @@
 use std::{path::Path, sync::Arc};
 
 use reqwest::ClientBuilder;
-use reqwest_cookie_store::{CookieStore, CookieStoreMutex};
+use reqwest_cookie_store::CookieStoreMutex;
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncReadExt};
 

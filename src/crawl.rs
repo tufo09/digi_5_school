@@ -32,7 +32,7 @@ pub struct ParsedBook {
 }
 
 pub async fn get_books(
-    ApiClient(client, cookie_store): ApiClient,
+    ApiClient(client, cookie_store): &ApiClient,
 ) -> anyhow::Result<Vec<ParsedBook>> {
     // HACK move this regex to a static variable
     let regex = regex::Regex::new(BOOK_REGEX).unwrap();
