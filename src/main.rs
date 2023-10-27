@@ -1,13 +1,18 @@
 use std::{
+    io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
+use anyhow::Context;
 use clap::{Parser, Subcommand};
 use crawl::ParsedBook;
 use reqwest_cookie_store::CookieStoreMutex;
 use util::{make_dirs, ApiClient};
 
+use crate::login::BASE_URL;
+
+mod books;
 mod crawl;
 mod login;
 mod util;
@@ -120,7 +125,31 @@ async fn handle_get_book(
     book_metadata: impl AsRef<Path>,
     index: usize,
 ) -> anyhow::Result<()> {
-    todo!()
+    let books: Vec<ParsedBook> = serde_json::from_reader(std::fs::File::open(book_metadata)?)?;
+
+    println!("Attempting to download book idx={index}...");
+
+    let book = books.get(index).context("Invalid index")?;
+    println!("Found book: {title}", title = book.title);
+
+    let client = util::load_cookies_from_json(login_cookies).await?;
+
+    let url = BASE_URL.to_string() + &book.url;
+    let initial_book_html = books::do_book_form_dance(&client, &url).await.unwrap();
+
+    write_cookies_to_disk(client.1.clone(), &timestamp, "do-book-form-dance")
+        .await
+        .unwrap();
+
+    let mut path = PathBuf::from("d5s/downloads/meta");
+    path.push(format!("initial_book_{id}_{timestamp}.html", id = book.id));
+    let mut file = std::fs::File::create(path)?;
+    file.write_all(initial_book_html.as_bytes())?;
+    file.flush()?;
+
+    println!("Wrote initial book html to disk.");
+
+    Ok(())
 }
 
 async fn handle_login(timestamp: &str, path: impl AsRef<Path>) -> anyhow::Result<ApiClient> {
