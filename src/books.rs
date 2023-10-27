@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
+use anyhow::Context;
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 use crate::util::ApiClient;
 
@@ -9,6 +11,8 @@ lazy_static! {
     static ref BOOK_HTML_TITLE_REGEX: Regex = Regex::new(r#"action='([^']+)'"#).unwrap();
     static ref BOOK_HTML_FORM_REGEX: Regex =
         Regex::new(r#"<input name='([^']+)' value='([^']*)'>"#).unwrap();
+    static ref BOOK_HTML_META_REGEX: Regex =
+        Regex::new(r#"<meta name="([^"]+)"(?: |\n)+content="([^"]*)" ?\/>"#).unwrap();
 }
 
 pub async fn do_book_form_dance(
@@ -92,4 +96,65 @@ pub async fn do_book_form_dance(
     // println!("\n{text}");
 
     Ok(text)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Metadata parsed from the initial book html
+pub struct BookMeta {
+    title: String,
+    sb_number: String,
+    first_page: String,
+    publisher: String,
+    publisher_web: String,
+    publisher_address: String,
+    publisher_tel: String,
+    publisher_mail: String,
+    // viewport: String,
+}
+
+pub fn extract_metadata_from_initial_html(initial_book_html: &str) -> anyhow::Result<BookMeta> {
+    let mut meta = HashMap::new();
+
+    BOOK_HTML_META_REGEX
+        .captures_iter(&initial_book_html)
+        .for_each(|capture| {
+            meta.insert(capture[1].to_string(), capture[2].to_string());
+        });
+
+    dbg!(&meta);
+
+    let book_meta = BookMeta {
+        title: meta.get("title").context("Missing title")?.to_string(),
+        sb_number: meta.get("sbnr").context("Missing sbnr")?.to_string(),
+        first_page: meta
+            .get("firstPage")
+            .context("Missing firstPage")?
+            .to_string(),
+        publisher: meta
+            .get("publisher")
+            .context("Missing publisher")?
+            .to_string(),
+        publisher_web: meta
+            .get("publisherweb")
+            .context("Missing publisherweb")?
+            .to_string(),
+        publisher_address: meta
+            .get("publisheradr")
+            .context("Missing publisheradr")?
+            .to_string(),
+        publisher_tel: meta
+            .get("publishertel")
+            .context("Missing publishertel")?
+            .to_string(),
+        publisher_mail: meta
+            .get("publishermail")
+            .context("Missing publishermail")?
+            .to_string(),
+        // viewport: meta
+        //     .get("viewport")
+        //     .context("Missing viewport")?
+        //     .to_string(),
+    };
+
+    Ok(book_meta)
 }

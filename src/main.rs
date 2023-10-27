@@ -149,6 +149,15 @@ async fn handle_get_book(
 
     println!("Wrote initial book html to disk.");
 
+    let book_meta = books::extract_metadata_from_initial_html(&initial_book_html).unwrap();
+
+    let mut path = PathBuf::from("d5s/downloads/meta");
+    path.push(format!("book_meta_{id}_{timestamp}.json", id = book.id));
+    let mut file = std::fs::File::create(path)?;
+    serde_json::to_writer_pretty(&mut file, &book_meta)?;
+
+    println!("Wrote book metadata to disk.");
+
     Ok(())
 }
 
