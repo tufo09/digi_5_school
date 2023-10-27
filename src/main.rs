@@ -4,6 +4,7 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
+use crawl::ParsedBook;
 use reqwest_cookie_store::CookieStoreMutex;
 use util::{make_dirs, ApiClient};
 
@@ -19,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
-    let client = match cli.command {
+    match cli.command {
         Commands::Login { path } => {
             handle_login(&timestamp, &path).await.unwrap();
         }
@@ -28,6 +29,18 @@ async fn main() -> anyhow::Result<()> {
         // }
         Commands::CrawlBooks { login_cookies } => {
             handle_crawl_books(&timestamp, &login_cookies)
+                .await
+                .unwrap();
+        }
+        Commands::CrawlInfo { book_metadata } => {
+            handle_crawl_info(&timestamp, &book_metadata).await.unwrap();
+        }
+        Commands::GetBook {
+            login_cookies,
+            book_metadata,
+            index,
+        } => {
+            handle_get_book(&timestamp, &login_cookies, &book_metadata, index)
                 .await
                 .unwrap();
         }
@@ -65,6 +78,49 @@ enum Commands {
         /// (default d5s/keys/cookies/2023..._login.json)
         login_cookies: String,
     },
+    CrawlInfo {
+        // #[clap(short, long)]
+        /// The path to the JSON file containing the book metadata.
+        /// (default d5s/downloads/meta/2023..._books.json)
+        book_metadata: String,
+    },
+    GetBook {
+        // #[clap(short, long)]
+        /// The path to the JSON file containing the cookies after a successful login.
+        /// (default d5s/keys/cookies/2023..._login.json)
+        login_cookies: String,
+
+        // #[clap(short, long)]
+        /// The path to the JSON file containing the book metadata.
+        /// (default d5s/downloads/meta/2023..._books.json)
+        book_metadata: String,
+
+        // #[clap(short, long)]
+        /// The index of the book to download (starting at 0).
+        index: usize,
+    },
+}
+
+async fn handle_crawl_info(timestamp: &str, book_metadata: impl AsRef<Path>) -> anyhow::Result<()> {
+    let books: Vec<ParsedBook> = serde_json::from_reader(std::fs::File::open(book_metadata)?)?;
+
+    println!("Found {} books:", books.len());
+
+    for (i, ParsedBook { title, .. }) in books.iter().enumerate() {
+        // Use one space of left padding for the index
+        println!("{i:>2}: {title}");
+    }
+
+    Ok(())
+}
+
+async fn handle_get_book(
+    timestamp: &str,
+    login_cookies: impl AsRef<Path>,
+    book_metadata: impl AsRef<Path>,
+    index: usize,
+) -> anyhow::Result<()> {
+    todo!()
 }
 
 async fn handle_login(timestamp: &str, path: impl AsRef<Path>) -> anyhow::Result<ApiClient> {
@@ -93,6 +149,7 @@ async fn handle_login(timestamp: &str, path: impl AsRef<Path>) -> anyhow::Result
     Ok(ApiClient(client, cookie_store))
 }
 
+#[deprecated]
 async fn handle_resume(timestamp: &str, path: impl AsRef<Path>) -> anyhow::Result<ApiClient> {
     let client = util::load_cookies_from_json(path).await?;
 
