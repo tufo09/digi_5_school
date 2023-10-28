@@ -4,6 +4,7 @@ use anyhow::Context;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncWriteExt;
 
 use crate::{crawl::ParsedBook, util::ApiClient};
 
@@ -212,4 +213,37 @@ pub async fn do_version_check(
     } else {
         Ok(Version::New)
     }
+}
+
+pub(crate) async fn do_download(
+    ApiClient(client, cookie_store): &ApiClient,
+    url: &str,
+    book_meta: &BookMeta,
+    version: &Version,
+    book: &ParsedBook,
+    save_path: impl AsRef<std::path::Path>,
+) -> anyhow::Result<()> {
+    // Append idx/idx.svg to the url, where idx is the page index
+    for page in 1..=book_meta.page_sizes.len() {
+        let url = format!("{url}{page}/{page}.svg");
+
+        dbg!(&url);
+        let response = client.get(&url).send().await?;
+
+        if !response.status().is_success() {
+            return Err(anyhow::anyhow!(
+                "Got non-success status code: {}",
+                response.status()
+            ));
+        };
+
+        let text = response.text().await?;
+
+        let mut path = save_path.as_ref().to_path_buf();
+        path.push(format!("{page}.svg"));
+        let mut file = tokio::fs::File::create(path).await?;
+        file.write_all(text.as_bytes()).await?;
+    }
+
+    Ok(())
 }

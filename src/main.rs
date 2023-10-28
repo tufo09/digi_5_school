@@ -169,6 +169,17 @@ async fn handle_get_book(
 
     let url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/";
 
+    // Create the directory for the book
+    let mut path = PathBuf::from("d5s/downloads/svgs");
+    path.push(&book.id);
+    path.push(timestamp);
+
+    std::fs::create_dir_all(&path)?;
+
+    books::do_download(&client, &url, &book_meta, &version, &book, &path)
+        .await
+        .unwrap();
+
     Ok(())
 }
 
