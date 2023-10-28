@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables)]
+
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -157,6 +159,15 @@ async fn handle_get_book(
     serde_json::to_writer_pretty(&mut file, &book_meta)?;
 
     println!("Wrote book metadata to disk.");
+
+    // let url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/" + &book.code + "/";
+
+    dbg!(&url);
+    let version = books::do_version_check(&client, &book, &book_meta)
+        .await
+        .unwrap();
+
+    let url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/";
 
     Ok(())
 }

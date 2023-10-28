@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::util::ApiClient;
+use crate::{crawl::ParsedBook, util::ApiClient};
 
 lazy_static! {
     static ref BOOK_HTML_TITLE_REGEX: Regex = Regex::new(r#"action='([^']+)'"#).unwrap();
@@ -53,6 +53,7 @@ pub async fn do_book_form_dance(
             form.insert(capture[1].to_string(), capture[2].to_string());
         });
 
+    dbg!(&url);
     let response = client.post(&url).form(&form).send().await?;
 
     if !response.status().is_success() {
@@ -83,6 +84,7 @@ pub async fn do_book_form_dance(
             form.insert(capture[1].to_string(), capture[2].to_string());
         });
 
+    dbg!(&url);
     let response = client.post(&url).form(&form).send().await?;
 
     if !response.status().is_success() {
@@ -171,4 +173,43 @@ pub fn extract_metadata_from_initial_html(initial_book_html: &str) -> anyhow::Re
     };
 
     Ok(book_meta)
+}
+
+pub enum Version {
+    Old,
+    New,
+}
+
+pub async fn do_version_check(
+    ApiClient(client, cookie_store): &ApiClient,
+    book: &ParsedBook,
+    book_meta: &BookMeta,
+) -> anyhow::Result<Version> {
+    let url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/" 
+    // + &book.code + "/";
+    ;
+    let url = url.to_string() + "1/1.svg";
+
+    dbg!(&url);
+    let response = client.get(&url).send().await?;
+
+    if !response.status().is_success() {
+        // return Err(anyhow::anyhow!(
+        //     "Got non-success status code: {}",
+        //     response.status()
+        // ));
+
+        dbg!(response.status());
+        dbg!(response.text().await?);
+
+        return Ok(Version::Old);
+    };
+
+    let text = response.text().await?;
+
+    if text.contains("svg") {
+        Ok(Version::Old)
+    } else {
+        Ok(Version::New)
+    }
 }
