@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables)]
+// #![allow(dead_code, unused_variables)]
 
 use std::{
     io::Write,
@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
                 .unwrap();
         }
         Commands::CrawlInfo { book_metadata } => {
-            handle_crawl_info(&timestamp, &book_metadata).await.unwrap();
+            handle_crawl_info(&book_metadata).await.unwrap();
         }
         Commands::GetBook {
             login_cookies,
@@ -108,7 +108,7 @@ enum Commands {
     },
 }
 
-async fn handle_crawl_info(timestamp: &str, book_metadata: impl AsRef<Path>) -> anyhow::Result<()> {
+async fn handle_crawl_info(book_metadata: impl AsRef<Path>) -> anyhow::Result<()> {
     let books: Vec<ParsedBook> = serde_json::from_reader(std::fs::File::open(book_metadata)?)?;
 
     println!("Found {} books:", books.len());
@@ -163,9 +163,7 @@ async fn handle_get_book(
     // let url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/" + &book.code + "/";
 
     dbg!(&url);
-    let version = books::do_version_check(&client, &book, &book_meta)
-        .await
-        .unwrap();
+    let _version = books::do_version_check(&client, &book).await.unwrap();
 
     let url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/";
 
@@ -176,7 +174,7 @@ async fn handle_get_book(
 
     std::fs::create_dir_all(&path)?;
 
-    books::do_download(&client, &url, &book_meta, &version, &book, &path)
+    books::do_download(&client, &url, &book_meta, &path)
         .await
         .unwrap();
 

@@ -19,7 +19,7 @@ lazy_static! {
 }
 
 pub async fn do_book_form_dance(
-    ApiClient(client, cookie_store): &ApiClient,
+    ApiClient(client, _): &ApiClient,
     url: &str,
 ) -> anyhow::Result<String> {
     let mut url = url.to_string();
@@ -183,9 +183,8 @@ pub enum Version {
 }
 
 pub async fn do_version_check(
-    ApiClient(client, cookie_store): &ApiClient,
+    ApiClient(client, _): &ApiClient,
     book: &ParsedBook,
-    book_meta: &BookMeta,
 ) -> anyhow::Result<Version> {
     let url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/" 
     // + &book.code + "/";
@@ -217,11 +216,9 @@ pub async fn do_version_check(
 }
 
 pub async fn do_download(
-    ApiClient(client, cookie_store): &ApiClient,
+    ApiClient(client, _): &ApiClient,
     url: &str,
     book_meta: &BookMeta,
-    version: &Version,
-    book: &ParsedBook,
     save_path: impl AsRef<std::path::Path>,
 ) -> anyhow::Result<()> {
     // Append idx/idx.svg to the url, where idx is the page index
@@ -257,9 +254,9 @@ pub struct Img {
 }
 
 pub async fn get_img(
-    ApiClient(client, cookie_store): &ApiClient,
-    book_meta: &BookMeta,
-    version: &Version,
+    ApiClient(client, _): &ApiClient,
+    // book_meta: &BookMeta,
+    // version: &Version,
     book: &ParsedBook,
     svg_path: impl AsRef<std::path::Path>,
     img_path: impl AsRef<std::path::Path>,
@@ -304,7 +301,7 @@ pub async fn get_img(
             let img = Img {
                 url,
                 page_number: page_number.parse::<usize>().unwrap(),
-                img_number: 0,
+                img_number,
             };
 
             img_urls.push(img);
