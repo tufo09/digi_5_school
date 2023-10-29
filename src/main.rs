@@ -1,15 +1,18 @@
 // #![allow(dead_code, unused_variables)]
 
 use std::{
+    cmp::min,
     io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use anyhow::Context;
+use books::BookMeta;
 use clap::{Parser, Subcommand};
 use crawl::ParsedBook;
 use reqwest_cookie_store::CookieStoreMutex;
+use serde::{Deserialize, Serialize};
 use util::{make_dirs, ApiClient};
 
 use crate::login::BASE_URL;
@@ -156,6 +159,13 @@ async fn handle_get_img(
     Ok(())
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BookComplete {
+    pub timestamp: String,
+    pub book_meta: BookMeta,
+    pub parsed_book: ParsedBook,
+}
+
 async fn handle_get_book(
     timestamp: &str,
     login_cookies: impl AsRef<Path>,
@@ -188,10 +198,34 @@ async fn handle_get_book(
 
     let book_meta = books::extract_metadata_from_initial_html(&initial_book_html).unwrap();
 
+    let book_complete = BookComplete {
+        timestamp: timestamp.to_string(),
+        book_meta: book_meta.clone(),
+        parsed_book: book.clone(),
+    };
+
+    let sanitized_title = book_meta
+        .title
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == ' ')
+        .collect::<String>()
+        .replace(" ", "_")
+        .replace("/", "_")
+        .replace("\\", "_")
+        .replace("__", "_")
+        .replace("__", "_")
+        .replace("__", "_")
+        .replace("__", "_")
+        .replace("__", "_");
+
     let mut path = PathBuf::from("d5s/downloads/meta");
-    path.push(format!("book_meta_{id}_{timestamp}.json", id = book.id));
+    path.push(format!(
+        "book_data_{id}_{timestamp}_{name}.json",
+        id = book.id,
+        name = &sanitized_title[..min(sanitized_title.len(), 85)]
+    ));
     let mut file = std::fs::File::create(path)?;
-    serde_json::to_writer_pretty(&mut file, &book_meta)?;
+    serde_json::to_writer_pretty(&mut file, &book_complete)?;
 
     println!("Wrote book metadata to disk.");
 

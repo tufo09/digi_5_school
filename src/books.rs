@@ -106,16 +106,16 @@ pub async fn do_book_form_dance(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// Metadata parsed from the initial book html
 pub struct BookMeta {
-    title: String,
-    sb_number: String,
-    first_page: String,
-    publisher: String,
-    publisher_web: String,
-    publisher_address: String,
-    publisher_tel: String,
-    publisher_mail: String,
-    // viewport: String,
-    page_sizes: Vec<[u16; 2]>,
+    pub title: String,
+    pub sb_number: String,
+    pub first_page: String,
+    pub publisher: String,
+    pub publisher_web: String,
+    pub publisher_address: String,
+    pub publisher_tel: String,
+    pub publisher_mail: String,
+    // pub viewport: String,
+    pub page_sizes: Vec<[u16; 2]>,
 }
 
 pub fn extract_metadata_from_initial_html(initial_book_html: &str) -> anyhow::Result<BookMeta> {
