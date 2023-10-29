@@ -51,6 +51,15 @@ async fn main() -> anyhow::Result<()> {
                 .await
                 .unwrap();
         }
+        Commands::GetImg {
+            login_cookies,
+            book_metadata,
+            book_id,
+        } => {
+            handle_get_img(&timestamp, &login_cookies, &book_metadata, book_id)
+                .await
+                .unwrap();
+        }
     };
 
     Ok(())
@@ -106,6 +115,21 @@ enum Commands {
         /// The index of the book to download (starting at 0).
         index: usize,
     },
+    GetImg {
+        // #[clap(short, long)]
+        /// The path to the JSON file containing the cookies after a successful login.
+        /// (default d5s/keys/cookies/2023..._login.json)
+        login_cookies: String,
+
+        // #[clap(short, long)]
+        /// The path to the JSON file containing the book metadata.
+        /// (default d5s/downloads/meta/2023..._books.json)
+        book_metadata: String,
+
+        // #[clap(short, long)]
+        /// The index of the book to download (starting at 0).
+        book_id: usize,
+    },
 }
 
 async fn handle_crawl_info(book_metadata: impl AsRef<Path>) -> anyhow::Result<()> {
@@ -117,6 +141,17 @@ async fn handle_crawl_info(book_metadata: impl AsRef<Path>) -> anyhow::Result<()
         // Use one space of left padding for the index
         println!("{i:>2}: {title}");
     }
+
+    Ok(())
+}
+
+async fn handle_get_img(
+    timestamp: &str,
+    login_cookies: impl AsRef<Path>,
+    book_metadata: impl AsRef<Path>,
+    book_id: usize,
+) -> anyhow::Result<()> {
+    todo!("Image downloader");
 
     Ok(())
 }

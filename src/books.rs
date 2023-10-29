@@ -257,11 +257,12 @@ pub async fn get_img(
     ApiClient(client, _): &ApiClient,
     // book_meta: &BookMeta,
     // version: &Version,
-    book: &ParsedBook,
+    // book: &ParsedBook,
     svg_path: impl AsRef<std::path::Path>,
     img_path: impl AsRef<std::path::Path>,
 ) -> anyhow::Result<()> {
-    let img_base_url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/";
+    // let img_base_url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/";
+    let img_base_url = "https://a.digi4school.at/ebook/".to_string() + "1667" + "/";
 
     // Image urls containing the absolute path to the image
     let mut img_urls = Vec::new();
