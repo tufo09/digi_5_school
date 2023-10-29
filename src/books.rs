@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Context;
+use bytes::Bytes;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,7 @@ lazy_static! {
     static ref BOOK_HTML_META_REGEX: Regex =
         Regex::new(r#"<meta name="([^"]+)"(?: |\n)+content="([^"]*)" ?\/>"#).unwrap();
     static ref BOOK_HTML_PAGE_REGEX: Regex = Regex::new(r#"\[(\d+),(\d+)\]"#).unwrap();
-    static ref IMG_REGEX: Regex = Regex::new(r#"#xlink:href="(img/[^"]+)"#).unwrap();
+    static ref IMG_REGEX: Regex = Regex::new(r#"xlink:href="(img/[^"]+)"#).unwrap();
 }
 
 pub async fn do_book_form_dance(
@@ -253,16 +254,17 @@ pub struct Img {
     pub img_number: usize,
 }
 
-pub async fn get_img(
+pub async fn get_img_urls(
     ApiClient(client, _): &ApiClient,
     // book_meta: &BookMeta,
     // version: &Version,
     // book: &ParsedBook,
+    book_id: &str,
     svg_path: impl AsRef<std::path::Path>,
-    img_path: impl AsRef<std::path::Path>,
-) -> anyhow::Result<()> {
-    // let img_base_url = "https://a.digi4school.at/ebook/".to_string() + &book.id + "/";
-    let img_base_url = "https://a.digi4school.at/ebook/".to_string() + "1667" + "/";
+    // img_path: impl AsRef<std::path::Path>,
+) -> anyhow::Result<Vec<Img>> {
+    let img_base_url = "https://a.digi4school.at/ebook/".to_string() + &book_id + "/";
+    // let img_base_url = "https://a.digi4school.at/ebook/".to_string() +  + "/";
 
     // Image urls containing the absolute path to the image
     let mut img_urls = Vec::new();
@@ -311,6 +313,20 @@ pub async fn get_img(
 
     dbg!(&img_urls[0..10]);
 
+    Ok(img_urls)
+}
+
+pub async fn fetch_img(
+    c: &ApiClient,
+    // book_meta: &BookMeta,
+    // version: &Version,
+    // book: &ParsedBook,
+    img_urls: &[Img],
+    // svg_path: impl AsRef<std::path::Path>,
+    img_path: impl AsRef<std::path::Path>,
+) -> anyhow::Result<()> {
+    let ApiClient(client, _) = &c;
+
     // Download the images
     let path = img_path.as_ref().to_path_buf();
     for img in img_urls {
@@ -333,6 +349,8 @@ pub async fn get_img(
         ));
         let mut file = tokio::fs::File::create(path).await?;
         file.write_all(&bytes).await?;
+
+        dbg!(&img.url);
     }
 
     Ok(())

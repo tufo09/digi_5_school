@@ -56,10 +56,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::GetImg {
             login_cookies,
-            book_metadata,
-            book_id,
+            full_book_data,
         } => {
-            handle_get_img(&timestamp, &login_cookies, &book_metadata, book_id)
+            handle_get_img(&timestamp, &login_cookies, &full_book_data)
                 .await
                 .unwrap();
         }
@@ -127,11 +126,7 @@ enum Commands {
         // #[clap(short, long)]
         /// The path to the JSON file containing the book metadata.
         /// (default d5s/downloads/meta/2023..._books.json)
-        book_metadata: String,
-
-        // #[clap(short, long)]
-        /// The index of the book to download (starting at 0).
-        book_id: usize,
+        full_book_data: String,
     },
 }
 
@@ -149,12 +144,45 @@ async fn handle_crawl_info(book_metadata: impl AsRef<Path>) -> anyhow::Result<()
 }
 
 async fn handle_get_img(
-    timestamp: &str,
+    now_timestamp: &str,
     login_cookies: impl AsRef<Path>,
-    book_metadata: impl AsRef<Path>,
-    book_id: usize,
+    full_book_data: impl AsRef<Path>,
 ) -> anyhow::Result<()> {
-    todo!("Image downloader");
+    let client = util::load_cookies_from_json(login_cookies).await?;
+    let book: BookComplete = serde_json::from_reader(std::fs::File::open(full_book_data)?)?;
+    let prev_timestamp = &book.timestamp;
+
+    // "Open" the book (we don't actually need the response, just the cookies)
+    let _ = books::do_book_form_dance(&client, &(BASE_URL.to_string() + &book.parsed_book.url))
+        .await
+        .unwrap();
+
+    let mut svg_path = PathBuf::from("d5s/downloads/svgs");
+    svg_path.push(&book.parsed_book.id);
+    svg_path.push(prev_timestamp);
+
+    let mut img_path = PathBuf::from("d5s/downloads/imgs");
+    img_path.push(&book.parsed_book.id);
+    img_path.push(now_timestamp);
+
+    std::fs::create_dir_all(&img_path)?;
+
+    let imgs = books::get_img_urls(&client, &book.parsed_book.id, &svg_path).await?;
+
+    let mut path = PathBuf::from("d5s/downloads/meta");
+    path.push(format!(
+        "imgs_{id}_{timestamp}.json",
+        id = book.parsed_book.id,
+        timestamp = now_timestamp
+    ));
+    let mut file = std::fs::File::create(path)?;
+    serde_json::to_writer_pretty(&mut file, &imgs)?;
+
+    println!("Wrote image metadata to disk.");
+
+    books::fetch_img(&client, &imgs, img_path).await?;
+
+    println!("Downloaded images successfully.");
 
     Ok(())
 }
@@ -244,6 +272,13 @@ async fn handle_get_book(
     std::fs::create_dir_all(&path)?;
 
     books::do_download(&client, &url, &book_meta, &path)
+        .await
+        .unwrap();
+
+    println!("Downloaded book successfully (without images).");
+
+    // Save cookies to disk
+    write_cookies_to_disk(client.1.clone(), &timestamp, "do-download")
         .await
         .unwrap();
 
