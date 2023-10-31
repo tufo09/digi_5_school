@@ -17,6 +17,7 @@ lazy_static! {
         Regex::new(r#"<meta name="([^"]+)"(?: |\n)+content="([^"]*)" ?\/>"#).unwrap();
     static ref BOOK_HTML_PAGE_REGEX: Regex = Regex::new(r#"\[(\d+),(\d+)\]"#).unwrap();
     static ref IMG_REGEX: Regex = Regex::new(r#"xlink:href="(img/[^"]+)"#).unwrap();
+    static ref SHADE_REGEX: Regex = Regex::new(r#"xlink:href="(shade/[^"]+)"#).unwrap();
 }
 
 pub async fn do_book_form_dance(
@@ -141,12 +142,14 @@ pub fn extract_metadata_from_initial_html(initial_book_html: &str) -> anyhow::Re
             page_sizes.push([width, height]);
         });
 
+    // println!("{}", initial_book_html);
+
     let book_meta = BookMeta {
         title: meta.get("title").context("Missing title")?.to_string(),
         sb_number: meta.get("sbnr").context("Missing sbnr")?.to_string(),
         first_page: meta
             .get("firstPage")
-            .context("Missing firstPage")?
+            .unwrap_or(&"___missing_first_page".to_string())
             .to_string(),
         publisher: meta
             .get("publisher")
@@ -252,6 +255,13 @@ pub struct Img {
     pub url: String,
     pub page_number: usize,
     pub img_number: usize,
+    pub img_type: ImgType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ImgType {
+    Img,
+    Shade,
 }
 
 pub async fn get_img_urls(
@@ -305,6 +315,40 @@ pub async fn get_img_urls(
                 url,
                 page_number: page_number.parse::<usize>().unwrap(),
                 img_number,
+                img_type: ImgType::Img,
+            };
+
+            img_urls.push(img);
+        });
+
+        // Extract the shade urls
+        SHADE_REGEX.captures_iter(&text).for_each(|capture| {
+            let relative_url = capture[1].to_string();
+            // relative: img/1.png
+            // absolute https://a.digi4school.at/ebook/1667/47/img/1.png
+
+            // The page number is `x` in `x.svg`
+            let page_number = path.file_stem().unwrap().to_str().unwrap();
+
+            let url = format!("{img_base_url}{page_number}/{relative_url}");
+
+            // `img_number` is the number in the relative url
+
+            let img_number = relative_url
+                .split("/")
+                .last()
+                .unwrap()
+                .split(".")
+                .next()
+                .unwrap()
+                .parse::<usize>()
+                .unwrap();
+
+            let img = Img {
+                url,
+                page_number: page_number.parse::<usize>().unwrap(),
+                img_number,
+                img_type: ImgType::Shade,
             };
 
             img_urls.push(img);
@@ -343,7 +387,8 @@ pub async fn fetch_img(
 
         let mut path = path.clone();
         path.push(format!(
-            "{page_number}_{img_number}.png",
+            "{img_type}_{page_number}_{img_number}.png",
+            img_type = get_img_name(&img.img_type),
             page_number = img.page_number,
             img_number = img.img_number
         ));
@@ -354,4 +399,11 @@ pub async fn fetch_img(
     }
 
     Ok(())
+}
+
+const fn get_img_name(img_type: &ImgType) -> &'static str {
+    match img_type {
+        ImgType::Img => "img",
+        ImgType::Shade => "shade",
+    }
 }
