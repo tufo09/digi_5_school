@@ -414,7 +414,10 @@ pub async fn dl_thumbnails(
     img_path: impl AsRef<std::path::Path>,
 ) -> anyhow::Result<()> {
     for page_number in 1..book.book_meta.page_sizes.len() {
-        let url = format!("https://a.digi4school.at/ebook/1723/thumbnails/{page_number}.jpg");
+        let url = format!(
+            "https://a.digi4school.at/ebook/{book_id}/thumbnails/{page_number}.jpg",
+            book_id = book.parsed_book.id
+        );
 
         let response = client.get(&url).send().await?;
 
