@@ -62,6 +62,14 @@ async fn main() -> anyhow::Result<()> {
                 .await
                 .unwrap();
         }
+        Commands::GetThumbs {
+            login_cookies,
+            full_book_data,
+        } => {
+            handle_get_thumbs(&timestamp, &login_cookies, &full_book_data)
+                .await
+                .unwrap();
+        }
     };
 
     Ok(())
@@ -128,6 +136,17 @@ enum Commands {
         /// (default d5s/downloads/meta/2023..._books.json)
         full_book_data: String,
     },
+    GetThumbs {
+        // #[clap(short, long)]
+        /// The path to the JSON file containing the cookies after a successful login.
+        /// (default d5s/keys/cookies/2023..._login.json)
+        login_cookies: String,
+
+        // #[clap(short, long)]
+        /// The path to the JSON file containing the book metadata.
+        /// (default d5s/downloads/meta/2023..._books.json)
+        full_book_data: String,
+    },
 }
 
 async fn handle_crawl_info(book_metadata: impl AsRef<Path>) -> anyhow::Result<()> {
@@ -139,6 +158,33 @@ async fn handle_crawl_info(book_metadata: impl AsRef<Path>) -> anyhow::Result<()
         // Use one space of left padding for the index
         println!("{i:>2}: {title}");
     }
+
+    Ok(())
+}
+
+async fn handle_get_thumbs(
+    now_timestamp: &str,
+    login_cookies: impl AsRef<Path>,
+    full_book_data: impl AsRef<Path>,
+) -> anyhow::Result<()> {
+    let client = util::load_cookies_from_json(login_cookies).await?;
+    let book: BookComplete = serde_json::from_reader(std::fs::File::open(full_book_data)?)?;
+    let prev_timestamp = &book.timestamp;
+
+    // "Open" the book (we don't actually need the response, just the cookies)
+    let _ = books::do_book_form_dance(&client, &(BASE_URL.to_string() + &book.parsed_book.url))
+        .await
+        .unwrap();
+
+    let mut img_path = PathBuf::from("d5s/downloads/imgs");
+    img_path.push(&book.parsed_book.id);
+    img_path.push(now_timestamp);
+
+    std::fs::create_dir_all(&img_path)?;
+
+    books::dl_thumbnails(&client, &book, &img_path).await?;
+
+    println!("Downloaded thumbnails successfully.");
 
     Ok(())
 }

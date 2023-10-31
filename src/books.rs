@@ -7,7 +7,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 
-use crate::{crawl::ParsedBook, util::ApiClient};
+use crate::{crawl::ParsedBook, util::ApiClient, BookComplete};
 
 lazy_static! {
     static ref BOOK_HTML_TITLE_REGEX: Regex = Regex::new(r#"action='([^']+)'"#).unwrap();
@@ -406,4 +406,37 @@ const fn get_img_name(img_type: &ImgType) -> &'static str {
         ImgType::Img => "img",
         ImgType::Shade => "shade",
     }
+}
+
+pub async fn dl_thumbnails(
+    ApiClient(client, _): &ApiClient,
+    book: &BookComplete,
+    img_path: impl AsRef<std::path::Path>,
+) -> anyhow::Result<()> {
+    for page_number in 1..book.book_meta.page_sizes.len() {
+        let url = format!("https://a.digi4school.at/ebook/1723/thumbnails/{page_number}.jpg");
+
+        let response = client.get(&url).send().await?;
+
+        if !response.status().is_success() {
+            return Err(anyhow::anyhow!(
+                "Got non-success status code: {}",
+                response.status()
+            ));
+        };
+
+        let bytes = response.bytes().await?;
+
+        let mut path = img_path.as_ref().to_path_buf();
+        path.push(format!("thumb_{page_number}.jpg",));
+
+        dbg!(&path, &url);
+
+        tokio::fs::File::create(path)
+            .await?
+            .write_all(&bytes)
+            .await?;
+    }
+
+    Ok(())
 }
