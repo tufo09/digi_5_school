@@ -165,6 +165,7 @@ async fn handle_auto(now_timestamp: &str, redo_login: bool) -> anyhow::Result<()
     let auto_cookies = Path::new("d5s/keys/cookies/auto_login.json");
     let auto_book_metadata = Path::new("d5s/downloads/meta/auto_books.json");
     let credentials;
+    let api_client;
 
     // Check if cookies exist
     if !auto_cookies.exists() || redo_login {
@@ -203,7 +204,8 @@ async fn handle_auto(now_timestamp: &str, redo_login: bool) -> anyhow::Result<()
         }
 
         // Then login and save cookies to disk
-        let ApiClient(client, cookie_store) = util::make_client_and_store();
+        api_client = util::make_client_and_store();
+        let ApiClient(client, cookie_store) = &api_client;
 
         login::perform_login(&client, &credentials)
             .await
@@ -219,7 +221,22 @@ async fn handle_auto(now_timestamp: &str, redo_login: bool) -> anyhow::Result<()
     } else {
         println!("Using pre-existing login cookies.");
         println!("If you want to login again, use --redo-login.");
+
+        // If so, load cookies from disk
+        api_client = util::load_cookies_from_json(auto_cookies).await?;
     }
+
+    // Crawl books
+    let books = crawl::get_books(&api_client).await.unwrap();
+    let mut file = std::fs::File::create(auto_book_metadata)?;
+    serde_json::to_writer_pretty(&mut file, &books)?;
+
+    println!("Crawled books successfully.");
+
+    // Ask for which book to download
+    let selection = cli::book_selection(&books).unwrap();
+
+    dbg!(selection);
 
     Ok(())
 }

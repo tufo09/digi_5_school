@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 
 use crate::util::ApiClient;
@@ -29,6 +31,18 @@ pub struct ParsedBook {
     pub title: String,
     pub publisher: String,
     pub expiry_date: String,
+}
+
+impl Display for ParsedBook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Simply print the first 85 chars of the title of the book
+        let title = if self.title.len() > 85 {
+            format!("{}...", &self.title[..85])
+        } else {
+            self.title.clone()
+        };
+        write!(f, "{}", title)
+    }
 }
 
 pub async fn get_books(ApiClient(client, _): &ApiClient) -> anyhow::Result<Vec<ParsedBook>> {
