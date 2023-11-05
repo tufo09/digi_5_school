@@ -18,6 +18,7 @@ use util::{make_dirs, ApiClient};
 use crate::login::BASE_URL;
 
 mod books;
+mod cli;
 mod crawl;
 mod login;
 mod util;
@@ -69,6 +70,9 @@ async fn main() -> anyhow::Result<()> {
             handle_get_thumbs(&timestamp, &login_cookies, &full_book_data)
                 .await
                 .unwrap();
+        }
+        Commands::Auto { redo_login } => {
+            handle_auto(&timestamp, redo_login).await.unwrap();
         }
     };
 
@@ -147,6 +151,77 @@ enum Commands {
         /// (default d5s/downloads/meta/2023..._books.json)
         full_book_data: String,
     },
+    /// Automatic, interactive mode (recommended).
+    Auto {
+        /// Redo login (even if cookies/creds exist).
+        #[clap(short, long)]
+        redo_login: bool,
+    },
+}
+
+async fn handle_auto(now_timestamp: &str, redo_login: bool) -> anyhow::Result<()> {
+    // Assume all data is located in the default directories
+    let auto_creds = Path::new("d5s/keys/credentials/auto_creds.json");
+    let auto_cookies = Path::new("d5s/keys/cookies/auto_login.json");
+    let auto_book_metadata = Path::new("d5s/downloads/meta/auto_books.json");
+    let credentials;
+
+    // Check if cookies exist
+    if !auto_cookies.exists() || redo_login {
+        // If not, check if credentials exist
+
+        println!(
+            "Cookies missing; checking for credentials in {auto_creds}",
+            auto_creds = auto_creds.display()
+        );
+
+        if !auto_creds.exists() || redo_login {
+            // If not, ask for credentials
+
+            println!("Username & password missing; please log in to digi4school:");
+
+            // Retry cli::get_credentials() in a while loop until it succeeds
+            credentials = loop {
+                match cli::get_credentials() {
+                    Ok(credentials) => break credentials,
+                    Err(e) => {
+                        println!("Error: {e}", e = e);
+                        println!("Please try again (or just press enter twice to exit).");
+                        continue;
+                    }
+                }
+            };
+
+            // Save credentials to disk
+            let mut file = std::fs::File::create(auto_creds)?;
+            serde_json::to_writer_pretty(&mut file, &credentials)?;
+        } else {
+            print!("Username & password found; logging in...");
+            // If so, load credentials from disk
+            let json = std::fs::read_to_string(auto_creds);
+            credentials = serde_json::from_str(&json?)?;
+        }
+
+        // Then login and save cookies to disk
+        let ApiClient(client, cookie_store) = util::make_client_and_store();
+
+        login::perform_login(&client, &credentials)
+            .await
+            .context("Login failed; maybe re-try password entry with --redo-login")
+            .unwrap();
+
+        // Write the cookies to disk
+        write_cookies_to_disk_detailed(cookie_store.clone(), auto_cookies)
+            .await
+            .unwrap();
+
+        println!("Logged in successfully.");
+    } else {
+        println!("Using pre-existing login cookies.");
+        println!("If you want to login again, use --redo-login.");
+    }
+
+    Ok(())
 }
 
 async fn handle_crawl_info(book_metadata: impl AsRef<Path>) -> anyhow::Result<()> {
@@ -396,6 +471,21 @@ async fn write_cookies_to_disk(
 ) -> anyhow::Result<()> {
     let mut path = PathBuf::from("d5s/keys/cookies");
     path.push(format!("{timestamp}_{name}.json"));
+    let file = std::fs::File::create(path)?;
+    let mut file = std::io::BufWriter::new(file);
+
+    let cookie_store = cookie_store.lock().unwrap();
+    cookie_store.save_json(&mut file).unwrap();
+
+    Ok(())
+}
+
+async fn write_cookies_to_disk_detailed(
+    cookie_store: Arc<CookieStoreMutex>,
+    path: impl AsRef<Path>,
+) -> anyhow::Result<()> {
+    let path = path.as_ref();
+
     let file = std::fs::File::create(path)?;
     let mut file = std::io::BufWriter::new(file);
 
