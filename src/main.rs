@@ -94,7 +94,15 @@ enum Commands {
 
         // #[clap(short, long)]
         // password: String,
-        /// The path to the JSON file containing the credentials ("email" and "password").
+        //
+        // Example for how the JSON file should look like:
+        // {
+        //     "email": "example@example.at",
+        //     "password": "example"
+        // }
+        //
+        // The path to the JSON file containing the credentials ("email" and "password").
+        // In case of using the automatic mode to generate the login, the path should be "d5s/keys/credentials/auto_creds.json".
         path: String,
     },
     // Resume {

@@ -60,6 +60,14 @@ pub async fn get_books(ApiClient(client, _): &ApiClient) -> anyhow::Result<Vec<P
 
     let text = response.text().await?;
 
+    println!();
+    println!();
+    println!();
+    println!("{text}");
+    println!();
+    println!();
+    println!();
+
     let mut books = Vec::new();
 
     for capture in regex.captures_iter(&text) {
